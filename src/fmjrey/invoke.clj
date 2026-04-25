@@ -5,7 +5,7 @@
 ;   By using this software in any fashion, you are agreeing to be bound by
 ;   the terms of this license.
 ;   You must not remove this notice, or any other, from this software.
-(ns clojure.tools.deps.interop
+(ns fmjrey.invoke
   "Functions for invoking Java processes and invoking tools via the Clojure CLI."
   (:require
    [clojure.java.process :as proc]
@@ -38,27 +38,32 @@
       (throw (RuntimeException. "Clojure CLI version is older than minimum required version, 1.11.1.1347. Please update to latest version.")))
     (throw (ex-info "Clojure CLI version unknown, please install the latest version." {}))))
 
-(defn ^:dynamic invoke-tool
-  "Invoke tool using Clojure CLI. Args (one of :tool-alias or :tool-name, and :fn
-  are required):
-    :tool-alias - Tool alias to invoke (keyword)
-    :tool-name - Name of installed tool to invoke (string or symbol)
+(defn ^:dynamic invoke
+  "Invoke tool using Clojure CLI. Args (one of :alias, :tool-alias or :tool-name,
+  and :fn are required):
+    :alias - Alias to invoke with -X (keyword)
+    :tool-alias - Tool alias to invoke with -T (keyword)
+    :tool-name - Name of installed tool to invoke with -T (string or symbol)
     :fn - Function (symbol)
     :args - map of args to pass to function
+    :dir - working directory for the new process (default=\".\")
 
   Options:
     :preserve-envelope - if true, return the full invocation envelope, default=false"
-  {:added "1.12"}
-  [{:keys [tool-name tool-alias fn args preserve-envelope]
+  [{:keys [dir alias tool-name tool-alias fn args preserve-envelope]
     :or {preserve-envelope false}
     :as opts}]
-  (when-not (or tool-name tool-alias) (throw (ex-info "Either :tool-alias or :tool-name must be provided" (or opts {}))))
+  (when-not (or alias tool-name tool-alias) (throw (ex-info "Either :alias, :tool-alias or :tool-name must be provided" (or opts {}))))
   (when-not (symbol? fn) (throw (ex-info (str ":fn should be a symbol " fn) (or opts {}))))
   (validate-version (cli-build))
   (let [args (conj [fn] (assoc args :clojure.exec/invoke :fn))
         _ (when (:debug opts) (println "args" args))
-        command-strs ["clojure" (str "-T" (or tool-alias tool-name)) "-"]
-        _ (when (:debug opts) (apply println "Invoking: " command-strs))
+        torx (if alias "-X" "-T")
+        command-strs ["clojure" (str torx (or tool-alias tool-name)) "-"]
+        command-strs (if dir (cons {:dir dir} command-strs) command-strs)
+        _ (when (:debug opts)
+            (apply println "Invoking: " command-strs)
+            (when dir (apply println "In dir: " dir)))
         proc (apply proc/start command-strs)
         in (proc/stdin proc)
         out (proc/stdout proc)
@@ -87,19 +92,27 @@
 
 (comment
   ;; regular invocation, should return {:hi :there}
-  (invoke-tool {:tool-alias :deps, :fn 'clojure.core/identity, :args {:hi :there}})
+  (invoke {:tool-alias :deps, :fn 'clojure.core/identity, :args {:hi :there}})
 
   ;; invocation throws, should return throwable map data
   (try
-    (invoke-tool {:tool-alias :deps, :fn 'clojure.core/+, :args {:fail :here}})
+    (invoke {:tool-alias :deps, :fn 'clojure.core/+, :args {:fail :here}})
     (catch clojure.lang.ExceptionInfo e (ex-data e)))
 
   ;; capture stdout in returned envelope
-  (let [resp (invoke-tool {:tool-alias :deps,
-                           :fn 'list
-                           :args {:format :edn
-                                  :clojure.exec/out :capture}
-                           :preserve-envelope true})]
+  (let [resp (invoke {:tool-alias :deps,
+                      :fn 'list
+                      :args {:format :edn
+                             :clojure.exec/out :capture}
+                      :preserve-envelope true})]
     (edn/read-string (:out resp)))
 
-  )
+  ;; invoking with -X fmjrey.project/info on fmjrey/project returning its
+  ;; :project/info alias map
+  (let [resp (invoke {:dir "../project" :alias :project,
+                      :preserve-envelope true
+                      :fn 'fmjrey.project/info,
+                      :args {:clojure.exec/err :capture
+                             :fmjrey.project/verbose :very}})]
+    (println resp)
+    (-> resp :err println)))
