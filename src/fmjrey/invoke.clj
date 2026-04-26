@@ -59,11 +59,11 @@
   (let [args (conj [fn] (assoc args :clojure.exec/invoke :fn))
         _ (when (:debug opts) (println "args" args))
         torx (if alias "-X" "-T")
-        command-strs ["clojure" (str torx (or tool-alias tool-name)) "-"]
+        command-strs ["clojure" (str torx (or alias tool-alias tool-name)) "-"]
         command-strs (if dir (cons {:dir dir} command-strs) command-strs)
         _ (when (:debug opts)
-            (apply println "Invoking: " command-strs)
-            (when dir (apply println "In dir: " dir)))
+            (apply println "Invoking:" command-strs)
+            (when dir (println "In dir:" dir)))
         proc (apply proc/start command-strs)
         in (proc/stdin proc)
         out (proc/stdout proc)
@@ -106,6 +106,12 @@
                              :clojure.exec/out :capture}
                       :preserve-envelope true})]
     (edn/read-string (:out resp)))
+
+  ;; invoke test-project
+  (invoke {:alias :cli
+           :dir "test-project"
+           :fn 'test.project/return
+           :args {:hi :there}})
 
   ;; invoking with -X fmjrey.project/info on fmjrey/project returning its
   ;; :project/info alias map

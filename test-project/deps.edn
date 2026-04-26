@@ -1,0 +1,2 @@
+{:paths ["src"]
+ :aliases {:cli {:ns-default test.project}}}
