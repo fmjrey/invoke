@@ -39,28 +39,37 @@
     (throw (ex-info "Clojure CLI version unknown, please install the latest version." {}))))
 
 (defn ^:dynamic invoke
-  "Invoke tool using Clojure CLI. Args (one of :alias, :tool-alias or :tool-name,
-  and :fn are required):
+  "Invoke tool using Clojure CLI. Args (one of :cp, :alias, :tool-alias or :tool-name,
+  and :fn are required, with the last 3 being mutually exclusive):
     :alias - Alias to invoke with -X (keyword)
     :tool-alias - Tool alias to invoke with -T (keyword)
     :tool-name - Name of installed tool to invoke with -T (string or symbol)
+    :cp - classpath to pass with -Scp (string)
     :fn - Function (symbol)
     :args - map of args to pass to function
     :dir - working directory for the new process (default=\".\")
 
   Options:
     :preserve-envelope - if true, return the full invocation envelope, default=false"
-  [{:keys [dir alias tool-name tool-alias fn args preserve-envelope]
+  [{:keys [dir cp alias tool-name tool-alias fn args preserve-envelope]
     :or {preserve-envelope false}
     :as opts}]
-  (when-not (or alias tool-name tool-alias) (throw (ex-info "Either :alias, :tool-alias or :tool-name must be provided" (or opts {}))))
+  (case (count (remove nil? [alias tool-name tool-alias]))
+    0 (when-not cp
+        (throw (ex-info "Either :cp, :alias, :tool-alias or :tool-name must be provided" (or opts {}))))
+    1 nil
+    (throw (ex-info "Only one of :alias, :tool-alias or :tool-name must be provided" (or opts {}))))
   (when-not (symbol? fn) (throw (ex-info (str ":fn should be a symbol " fn) (or opts {}))))
   (validate-version (cli-build))
   (let [args (conj [fn] (assoc args :clojure.exec/invoke :fn))
         _ (when (:debug opts) (println "args" args))
-        torx (if alias "-X" "-T")
-        command-strs ["clojure" (str torx (or alias tool-alias tool-name)) "-"]
-        command-strs (if dir (cons {:dir dir} command-strs) command-strs)
+        torx (if (or tool-alias tool-name) "-T" "-X")
+        command-strs (cond-> []
+                       dir (conj {:dir dir})
+                       true (conj "clojure")
+                       cp (conj "-Scp" cp)
+                       torx (conj (str torx (or alias tool-alias tool-name)))
+                       true (conj "-"))
         _ (when (:debug opts)
             (apply println "Invoking:" command-strs)
             (when dir (println "In dir:" dir)))
@@ -72,10 +81,10 @@
               *print-level*  nil
               *print-namespace-maps* false]
       (proc/io-task
-        #(with-open [w (jio/writer in)]
-           (doseq [a args]
-             (.write w (pr-str a))
-             (.write w " ")))))
+       #(with-open [w (jio/writer in)]
+          (doseq [a args]
+            (.write w (pr-str a))
+            (.write w " ")))))
     (if-let [envelope (edn/read-string (slurp out))]
       (if preserve-envelope
         envelope
@@ -87,8 +96,8 @@
       (let [err-str (slurp err)
             err-msg (if (= "" err-str) "Unknown error invoking Clojure CLI" err-str)]
         (throw (ex-info err-msg
-                 {:command (str/join " " command-strs)
-                  :in (str/join " " args)}))))))
+                        {:command (str/join " " command-strs)
+                         :in (str/join " " args)}))))))
 
 (comment
   ;; regular invocation, should return {:hi :there}
@@ -108,7 +117,8 @@
     (edn/read-string (:out resp)))
 
   ;; invoke test-project
-  (invoke {:alias :cli
+  (invoke {:debug true
+           :alias :cli
            :dir "test-project"
            :fn 'test.project/return
            :args {:hi :there}})

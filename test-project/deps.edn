@@ -1,2 +1,4 @@
 {:paths ["src"]
- :aliases {:cli {:ns-default test.project}}}
+ :aliases {:cli {:ns-default test.project}
+           :build {:deps {io.github.clojure/tools.build {:mvn/version "0.10.12"}}
+                   :ns-default build}}}
