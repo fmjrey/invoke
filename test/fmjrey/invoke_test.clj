@@ -42,7 +42,7 @@
                               :args arg}))))))
 
 (deftest invoke-build
-  (testing "invoke test-project with -T:build jar."
+  (testing "invoke test-project with -T:build uberjar."
     (let [arg {}]
       (is (= arg (ext/invoke {:tool-alias :build
                               :dir "test-project"
