@@ -41,6 +41,14 @@
                               :fn 'return
                               :args arg}))))))
 
+(deftest invoke-build
+  (testing "invoke test-project with -T:build jar."
+    (let [arg {}]
+      (is (= arg (ext/invoke {:tool-alias :build
+                              :dir "test-project"
+                              :fn 'uberjar
+                              :args arg}))))))
+
 (deftest invoke-cp
   (testing "invoke test-project with -X and -Scp."
     (let [arg {:test1 :test2}]
@@ -73,4 +81,5 @@
   (preserve-envelope)
   (invoke-alias)
   (invoke-dir)
+  (invoke-build)
   (invoke-cp))
