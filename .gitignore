@@ -26,5 +26,4 @@
 *~
 /checkouts
 /classes
-/target
-!/test-project/target/invoke-test.jar
+**/target
