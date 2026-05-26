@@ -3,7 +3,9 @@
     fmjrey/invoke {:git/tag "TAG" :git/sha "SHA"}
 
 Utility library to invoke a clojure function in an external process via the
-clojure CLI and capture its result as clojure data.
+clojure CLI and capture its result as clojure data. The called function must
+take a single map argument like [tools.build](https://clojure.org/guides/tools_build)
+task functions.
 
 This project is essentially an augmented copy of the clojure namespace
 [`clojure.tools.deps.interop`](https://clojuredocs.org/clojure.tools.deps.interop),
@@ -54,6 +56,7 @@ Then call the `invoke` function:
     {:hi :there}
     fmjrey.invoke> 
 
+Keep in mind the function to be called must take a single map argument.
 The `invoke` function works the same way as
 [`invoke-tool`](https://clojuredocs.org/clojure.tools.deps.interop/invoke-tool)
 from clojure, expanding its capabilities with 3 additional option keys:
@@ -65,7 +68,7 @@ from clojure, expanding its capabilities with 3 additional option keys:
 As a result it's now one of `:cp`, `:alias,` `:tool-alias` or `:tool-name`,
 that must be provided, with the last 3 being mutually exclusive. Only the
 first two make use of the clojure CLI `-X` option while the last two use `-T`.
-Note that `:cp` uses `-X` by default unless overridden by one of the others. 
+Note that `:cp` uses `-X` by default unless overridden by one of the others.
 
 The `:cp` option value is passed to the clojure CLI with `-Scp`, which makes it
 possible to invoke a function in a (uber)jar. While the
